@@ -6,6 +6,7 @@
 #include "blas.h"
 #include "dark_cuda.h"
 #include <stdio.h>
+#include <string.h>
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
 #endif
@@ -326,10 +327,34 @@ int compare_by_probs(const void *a_ptr, const void *b_ptr) {
     return delta < 0 ? -1 : delta > 0 ? 1 : 0;
 }
 
-void draw_detections_v3(image im, detection *dets, int num, float thresh, char **names, image **alphabet, int classes, int ext_output)
+void draw_detections_v3(image im, detection *dets, int num, float thresh, char **names, image **alphabet, int classes, int ext_output, char* filename)
 {
     static int frame_id = 0;
     frame_id++;
+
+
+    char* delimiter = "/";
+    char* token = strtok(filename, delimiter);
+    char buf[50];
+    // NOTE: This requires that the input file be in the format /tmp/converted-frames-{r1}-{r2}-{z}-{pid}
+    // More specifically, it must have 5 dashes. TODO: Make this smoother
+    while (token != NULL) {
+        if (strstr(token, "converted")) {
+            int dash_counter = 0;
+            int idx = 0;
+            for (int i = 0; i < strlen(token); i++) {
+                if (token[i] == '-') {
+                    dash_counter += 1;    
+                }
+                else if (dash_counter == 5) {
+                    buf[idx] = token[i];
+                    idx += 1;
+                }
+            }
+        }
+        token = strtok(NULL, delimiter);
+    }
+
 
     int selected_detections_num;
     detection_with_class* selected_detections = get_actual_detections(dets, num, thresh, &selected_detections_num, names);
@@ -365,7 +390,12 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
 
     // image output
     qsort(selected_detections, selected_detections_num, sizeof(*selected_detections), compare_by_probs);
+    char* file_extension = "-predictions.csv";
+    strcat(buf, file_extension); 
+    FILE* csv_output = fopen(buf, "w");
+    fprintf(csv_output, "left,top,right,bottom,class,confidence\n");
     for (i = 0; i < selected_detections_num; ++i) {
+
             int width = im.h * .002;
             if (width < 1)
                 width = 1;
@@ -401,7 +431,14 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
             if (right > im.w - 1) right = im.w - 1;
             if (top < 0) top = 0;
             if (bot > im.h - 1) bot = im.h - 1;
-
+            const int best_class = selected_detections[i].best_class;
+            printf("%s: %.0f%%", names[best_class],    selected_detections[i].det.prob[best_class] * 100);
+            float confidence = selected_detections[i].det.prob[best_class] * 100;
+            char* class = names[best_class];            
+            // Print bounding box values 
+            printf("\n\tBounding Box: Left=%d, Top=%d, Right=%d, Bottom=%d\n", left, top, right, bot); 
+            fprintf(csv_output, "%d,%d,%d,%d,%s,%f\n", left, top, right, bot, class, confidence);
+            draw_box_width(im, left, top, right, bot, width, red, green, blue);
             //int b_x_center = (left + right) / 2;
             //int b_y_center = (top + bot) / 2;
             //int b_width = right - left;
@@ -459,6 +496,7 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
                 free_image(tmask);
             }
     }
+    fclose(csv_output);
     free(selected_detections);
 }
 
