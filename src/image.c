@@ -331,7 +331,7 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
 {
     static int frame_id = 0;
     frame_id++;
-
+    printf("Filename = %s\n", filename);
 
     char* delimiter = "/";
     char* token = strtok(filename, delimiter);
@@ -344,6 +344,9 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
             int idx = 0;
             for (int i = 0; i < strlen(token); i++) {
                 if (token[i] == '-') {
+                    if (i > 0 && token[i-1] == '-') {
+                        dash_counter -= 1; 
+                    }
                     dash_counter += 1;    
                 }
                 else if (dash_counter == 5) {
@@ -355,7 +358,7 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
         token = strtok(NULL, delimiter);
     }
 
-
+    printf("PID = %s\n", buf);
     int selected_detections_num;
     detection_with_class* selected_detections = get_actual_detections(dets, num, thresh, &selected_detections_num, names);
 
@@ -393,6 +396,7 @@ void draw_detections_v3(image im, detection *dets, int num, float thresh, char *
     char* file_extension = "-predictions.csv";
     strcat(buf, file_extension); 
     FILE* csv_output = fopen(buf, "w");
+//    FILE* csv_output = fopen("predictions.csv", "w");
     fprintf(csv_output, "left,top,right,bottom,class,confidence\n");
     for (i = 0; i < selected_detections_num; ++i) {
 
